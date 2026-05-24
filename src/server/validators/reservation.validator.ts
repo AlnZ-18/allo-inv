@@ -8,6 +8,10 @@ export const createReservationSchema = z.object({
     .positive({ message: "Quantity must be strictly greater than 0" }),
 });
 
+export const idParamSchema = z.object({
+  id: z.string().uuid({ message: "Reservation ID must be a valid UUID parameter" }),
+});
+
 export const confirmReservationSchema = z.object({
   id: z.string().uuid({ message: "Reservation ID must be a valid UUID" }),
 });
@@ -17,5 +21,6 @@ export const releaseReservationSchema = z.object({
 });
 
 export type CreateReservationInput = z.infer<typeof createReservationSchema>;
+export type IdParamInput = z.infer<typeof idParamSchema>;
 export type ConfirmReservationInput = z.infer<typeof confirmReservationSchema>;
 export type ReleaseReservationInput = z.infer<typeof releaseReservationSchema>;

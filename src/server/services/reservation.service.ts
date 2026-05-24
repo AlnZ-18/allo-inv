@@ -13,14 +13,13 @@ export class ReservationService {
    * and pessimistic row-level locking (SELECT ... FOR UPDATE).
    */
   static async createReservation(input: CreateReservationInput) {
-    const { inventoryId, quantity, expiryMinutes = 5 } = input;
+    const { inventoryId, quantity, expiryMinutes = 10 } = input;
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + expiryMinutes);
 
-    // Explicit monolithic database transaction
     return await prisma.$transaction(async (tx) => {
-      // 1. Lock the inventory row using SELECT ... FOR UPDATE
-      // Since Prisma doesn't support built-in row locking, we run a raw Postgres query.
+      // 1. Lock the inventory row exclusively using SELECT ... FOR UPDATE
+      // Prisma does not support row-locking directly, so we run a raw Postgres query.
       const lockedInventories = await tx.$queryRaw<any[]>`
         SELECT * FROM "Inventory"
         WHERE "id" = ${inventoryId}
@@ -34,9 +33,9 @@ export class ReservationService {
       const inventory = lockedInventories[0];
       const availableUnits = inventory.totalUnits - inventory.reservedUnits;
 
-      // 2. Check stock capacity
+      // 2. Check stock capacity atomically
       if (availableUnits < quantity) {
-        throw new Error("INSUFFICIENT_STOCK"); // Rollback automatically triggered
+        throw new Error("INSUFFICIENT_STOCK"); // Will trigger automatic transaction rollback
       }
 
       // 3. Create the Reservation record
@@ -49,7 +48,7 @@ export class ReservationService {
         },
       });
 
-      // 4. Update the parent inventory's reserved units
+      // 4. Update parent inventory reserved units
       await tx.inventory.update({
         where: { id: inventoryId },
         data: {
@@ -65,7 +64,8 @@ export class ReservationService {
 
   /**
    * Concurrency-safe state transition: pending -> confirmed.
-   * Confirmed reservations can never be released.
+   * Only pending, non-expired reservations can be confirmed.
+   * Decrements both reservedUnits and totalUnits.
    */
   static async confirmReservation(id: string) {
     return await prisma.$transaction(async (tx) => {
@@ -81,6 +81,26 @@ export class ReservationService {
         throw new Error("INVALID_STATE_TRANSITION");
       }
 
+      // Expiry validation: return HTTP 410 (via RESERVATION_EXPIRED error mapping) if expired
+      const now = new Date();
+      if (reservation.expiresAt < now) {
+        throw new Error("RESERVATION_EXPIRED");
+      }
+
+      // 1. Update parent inventory (deduct reserved and total units since checkout is complete)
+      await tx.inventory.update({
+        where: { id: reservation.inventoryId },
+        data: {
+          reservedUnits: {
+            decrement: reservation.quantity,
+          },
+          totalUnits: {
+            decrement: reservation.quantity,
+          },
+        },
+      });
+
+      // 2. Transition reservation status
       return await tx.reservation.update({
         where: { id },
         data: {
@@ -93,7 +113,7 @@ export class ReservationService {
 
   /**
    * Release a pending reservation manually (pending -> released).
-   * Restores reserved inventory units.
+   * Restores held inventory units.
    */
   static async releaseReservation(id: string) {
     return await prisma.$transaction(async (tx) => {
@@ -109,7 +129,7 @@ export class ReservationService {
         throw new Error("INVALID_STATE_TRANSITION");
       }
 
-      // Decrement the held inventory reserved units
+      // 1. Decrement reservedUnits in parent inventory to return stock to available pool
       await tx.inventory.update({
         where: { id: reservation.inventoryId },
         data: {
@@ -119,6 +139,7 @@ export class ReservationService {
         },
       });
 
+      // 2. Transition reservation status
       return await tx.reservation.update({
         where: { id },
         data: {
@@ -131,13 +152,11 @@ export class ReservationService {
 
   /**
    * Vercel Cron-triggered batch cleanup job.
-   * Releases all expired reservations (status = pending and expiresAt < now)
-   * in a safe transactional workflow.
+   * Releases all expired reservations in a safe transaction pool.
    */
   static async cleanupExpiredReservations() {
     const now = new Date();
 
-    // Find all expired pending reservations
     const expiredReservations = await prisma.reservation.findMany({
       where: {
         status: ReservationStatus.pending,
@@ -154,8 +173,7 @@ export class ReservationService {
         await this.releaseReservation(reservation.id);
         releasedCount++;
       } catch (err) {
-        // Log error and continue to avoid blocking other expirations
-        console.error(`Failed to release reservation ${reservation.id}:`, err);
+        console.error(`Failed to release expired reservation ${reservation.id}:`, err);
       }
     }
 
