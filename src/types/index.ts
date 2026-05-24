@@ -30,7 +30,7 @@ export interface Inventory {
 export interface Reservation {
   id: string;
   inventoryId: string;
-  units: number;
+  quantity: number;
   status: ReservationStatus;
   expiresAt: Date;
   confirmedAt?: Date | null;

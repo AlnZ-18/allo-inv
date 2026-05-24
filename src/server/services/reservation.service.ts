@@ -3,7 +3,7 @@ import { ReservationStatus } from '@prisma/client';
 
 export interface CreateReservationInput {
   inventoryId: string;
-  units: number;
+  quantity: number;
   expiryMinutes?: number;
 }
 
@@ -13,7 +13,7 @@ export class ReservationService {
    * and pessimistic row-level locking (SELECT ... FOR UPDATE).
    */
   static async createReservation(input: CreateReservationInput) {
-    const { inventoryId, units, expiryMinutes = 5 } = input;
+    const { inventoryId, quantity, expiryMinutes = 5 } = input;
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + expiryMinutes);
 
@@ -35,7 +35,7 @@ export class ReservationService {
       const availableUnits = inventory.totalUnits - inventory.reservedUnits;
 
       // 2. Check stock capacity
-      if (availableUnits < units) {
+      if (availableUnits < quantity) {
         throw new Error("INSUFFICIENT_STOCK"); // Rollback automatically triggered
       }
 
@@ -43,7 +43,7 @@ export class ReservationService {
       const reservation = await tx.reservation.create({
         data: {
           inventoryId,
-          units,
+          quantity,
           status: ReservationStatus.pending,
           expiresAt,
         },
@@ -54,7 +54,7 @@ export class ReservationService {
         where: { id: inventoryId },
         data: {
           reservedUnits: {
-            increment: units,
+            increment: quantity,
           },
         },
       });
@@ -114,7 +114,7 @@ export class ReservationService {
         where: { id: reservation.inventoryId },
         data: {
           reservedUnits: {
-            decrement: reservation.units,
+            decrement: reservation.quantity,
           },
         },
       });

@@ -50,7 +50,7 @@ model Reservation {
   id          String            @id @default(uuid())
   inventoryId String
   inventory   Inventory         @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
-  units       Int
+  quantity    Int
   status      ReservationStatus @default(pending)
   expiresAt   DateTime
   confirmedAt DateTime?
