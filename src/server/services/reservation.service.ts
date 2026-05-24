@@ -152,11 +152,14 @@ export class ReservationService {
 
   /**
    * Vercel Cron-triggered batch cleanup job.
-   * Releases all expired reservations in a safe transaction pool.
+   * Releases all expired reservations (status = pending and expiresAt < now)
+   * in a safe, transactional, and idempotent row-locking workflow.
    */
   static async cleanupExpiredReservations() {
     const now = new Date();
+    console.log(`[Cleanup] Started reservation cleanup check at ${now.toISOString()}`);
 
+    // 1. Find all expired pending reservations
     const expiredReservations = await prisma.reservation.findMany({
       where: {
         status: ReservationStatus.pending,
@@ -164,19 +167,71 @@ export class ReservationService {
           lt: now,
         },
       },
+      orderBy: {
+        createdAt: 'asc',
+      },
     });
 
-    let releasedCount = 0;
+    console.log(`[Cleanup] Found ${expiredReservations.length} expired pending reservations.`);
+
+    const releasedReservationIds: string[] = [];
 
     for (const reservation of expiredReservations) {
       try {
-        await this.releaseReservation(reservation.id);
-        releasedCount++;
-      } catch (err) {
-        console.error(`Failed to release expired reservation ${reservation.id}:`, err);
+        await prisma.$transaction(async (tx) => {
+          // Step 1: Lock the related inventory row to prevent concurrent adjustments
+          const lockedInventories = await tx.$queryRaw<any[]>`
+            SELECT * FROM "Inventory"
+            WHERE "id" = ${reservation.inventoryId}
+            FOR UPDATE
+          `;
+
+          if (lockedInventories.length === 0) {
+            throw new Error("INVENTORY_NOT_FOUND");
+          }
+
+          // Idempotency check: verify reservation status is still pending inside the transaction
+          const currentRes = await tx.reservation.findUnique({
+            where: { id: reservation.id },
+          });
+
+          if (!currentRes || currentRes.status !== ReservationStatus.pending) {
+            console.log(`[Cleanup] Skipping reservation ${reservation.id} - status already transitioned.`);
+            return;
+          }
+
+          // Step 2: Update reservation status -> released and releasedAt -> now
+          await tx.reservation.update({
+            where: { id: reservation.id },
+            data: {
+              status: ReservationStatus.released,
+              releasedAt: new Date(),
+            },
+          });
+
+          // Step 3: Decrement parent Inventory.reservedUnits
+          await tx.inventory.update({
+            where: { id: reservation.inventoryId },
+            data: {
+              reservedUnits: {
+                decrement: reservation.quantity,
+              },
+            },
+          });
+
+          releasedReservationIds.push(reservation.id);
+          console.log(`[Cleanup] Successfully released expired reservation: ${reservation.id}`);
+        });
+      } catch (err: any) {
+        console.error(`[Cleanup] Failed to release expired reservation ${reservation.id}:`, err);
       }
     }
 
-    return { releasedCount };
+    console.log(`[Cleanup] Cleanup completed. Released ${releasedReservationIds.length} reservations.`);
+
+    return {
+      cleaned: releasedReservationIds.length,
+      releasedReservationIds,
+    };
   }
 }
