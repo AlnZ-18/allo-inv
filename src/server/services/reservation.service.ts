@@ -13,7 +13,7 @@ export class ReservationService {
    * and pessimistic row-level locking (SELECT ... FOR UPDATE).
    */
   static async createReservation(input: CreateReservationInput) {
-    const { inventoryId, quantity, expiryMinutes = 1 } = input;
+    const { inventoryId, quantity, expiryMinutes = 10 } = input;
     const expiresAt = new Date();
     expiresAt.setMinutes(expiresAt.getMinutes() + expiryMinutes);
 
