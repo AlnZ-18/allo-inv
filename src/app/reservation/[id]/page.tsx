@@ -7,7 +7,6 @@ import { api, ReservationDetails, ApiError } from '@/lib/api';
 export default function ReservationPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   
-  // Await the Next.js 16 dynamic parameter promise using React.use
   const { id } = use(params);
 
   const [reservation, setReservation] = useState<ReservationDetails | null>(null);
@@ -21,7 +20,6 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
     fetchReservationDetails();
   }, [id]);
 
-  // Expiry Countdown logic
   useEffect(() => {
     if (!reservation || reservation.status !== 'pending') return;
 
@@ -30,7 +28,6 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
       if (difference <= 0) {
         setTimeLeft(0);
         setIsExpired(true);
-        // Force the reservation to be released/expired locally
         return;
       }
       setTimeLeft(Math.floor(difference / 1000));
@@ -48,7 +45,6 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
       const data = await api.getReservation(id);
       setReservation(data);
       
-      // Compute if already expired
       const difference = +new Date(data.expiresAt) - +new Date();
       if (difference <= 0 && data.status === 'pending') {
         setIsExpired(true);
@@ -112,10 +108,10 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
         <div className="text-center space-y-4">
-          <span className="w-10 h-10 border-4 border-slate-800 border-t-blue-500 rounded-full animate-spin inline-block"></span>
-          <p className="text-slate-400 text-sm">Fetching reservation details...</p>
+          <span className="w-10 h-10 border-4 border-slate-200 border-t-accent rounded-full animate-spin inline-block"></span>
+          <p className="text-slate-500 text-sm">Fetching reservation details...</p>
         </div>
       </div>
     );
@@ -123,18 +119,18 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
 
   if (error && !reservation) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-2xl p-6 text-center space-y-6">
-          <div className="w-12 h-12 bg-red-950 border border-red-800 text-red-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-surface border border-slate-200 rounded-2xl p-6 text-center space-y-6 shadow-md">
+          <div className="w-12 h-12 bg-red-100 border border-red-200 text-red-700 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
             ⚠️
           </div>
           <div className="space-y-2">
-            <h2 className="text-lg font-bold text-white">Failed to Load Reservation</h2>
-            <p className="text-slate-400 text-sm">{error}</p>
+            <h2 className="text-lg font-bold text-primary">Failed to Load Reservation</h2>
+            <p className="text-slate-500 text-sm">{error}</p>
           </div>
           <button 
             onClick={() => router.push('/products')}
-            className="w-full bg-slate-800 hover:bg-slate-700 text-white py-2 px-4 rounded text-sm transition"
+            className="w-full bg-primary hover:bg-primary/95 text-white py-2 px-4 rounded text-sm font-semibold transition shadow-sm cursor-pointer"
           >
             Back to Products
           </button>
@@ -153,39 +149,42 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
   const isReleased = reservation.status === 'released' || (reservation.status === 'pending' && isExpired);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 md:p-12 flex items-center justify-center">
+    <div className="min-h-screen bg-background text-foreground p-6 md:p-12 flex items-center justify-center">
       <div className="max-w-xl w-full space-y-6">
         
         {/* Navigation shortcut */}
         <button 
           onClick={() => router.push('/products')}
-          className="text-sm text-slate-400 hover:text-white transition flex items-center gap-1"
+          className="text-sm font-bold text-slate-500 hover:text-primary transition flex items-center gap-1.5 cursor-pointer group"
         >
-          ← Back to Product Inventory
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          Back to Product Inventory
         </button>
 
         {/* Card Board */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+        <div className="bg-surface border border-border rounded-3xl shadow-xl overflow-hidden hover:shadow-2xl transition duration-300">
           
           {/* Header Banner */}
-          <div className="bg-slate-950 p-6 border-b border-slate-800 flex items-center justify-between">
-            <span className="text-sm font-semibold text-slate-400">
-              Reservation ID: <code className="text-xs text-slate-200">{reservation.id.slice(0, 8)}...</code>
+          <div className="bg-slate-50/50 p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+              Reservation ID: <code className="text-xs text-primary font-mono bg-primary/5 px-2 py-0.5 rounded border border-primary/10">{reservation.id.slice(0, 8)}...</code>
             </span>
             
             {/* Status Badges */}
             {isConfirmed && (
-              <span className="px-3 py-1 text-xs bg-emerald-950 border border-emerald-800 text-emerald-400 rounded-full font-bold">
+              <span className="self-start sm:self-auto px-3 py-1 text-[11px] bg-emerald-100 border border-emerald-200/80 text-emerald-700 rounded-full font-bold uppercase tracking-wider leading-none">
                 ✓ Confirmed
               </span>
             )}
             {isReleased && (
-              <span className="px-3 py-1 text-xs bg-red-950 border border-red-800 text-red-400 rounded-full font-bold">
+              <span className="self-start sm:self-auto px-3 py-1 text-[11px] bg-red-100 border border-red-200/80 text-red-700 rounded-full font-bold uppercase tracking-wider leading-none">
                 ✕ Released / Expired
               </span>
             )}
             {isPending && (
-              <span className="px-3 py-1 text-xs bg-blue-950 border border-blue-800 text-blue-400 rounded-full font-bold animate-pulse">
+              <span className="self-start sm:self-auto px-3 py-1 text-[11px] bg-amber-50 border border-amber-200/80 text-amber-700 rounded-full font-bold uppercase tracking-wider leading-none animate-pulse">
                 ⏳ Holding Stock
               </span>
             )}
@@ -195,61 +194,72 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
             
             {/* Countdown timer for active states */}
             {isPending && (
-              <div className="text-center py-6 bg-slate-950 border border-slate-800/80 rounded-xl space-y-2">
-                <div className="text-4xl font-mono font-black text-white tracking-widest">
+              <div className={`text-center py-6 border rounded-2xl space-y-2 shadow-sm transition duration-300 ${
+                timeLeft < 60 
+                  ? 'bg-red-50 border-red-200 animate-pulse' 
+                  : 'bg-slate-100/50 border-border'
+              }`}>
+                <div className={`text-4xl md:text-5xl font-mono font-black tracking-widest ${
+                  timeLeft < 60 ? 'text-red-600' : 'text-primary'
+                }`}>
                   {formatTime(timeLeft)}
                 </div>
-                <p className="text-xs text-slate-400">
-                  Hold time remaining. Purchase must be completed before expiry.
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
+                  Hold Period Remaining
+                </p>
+                <p className="text-[10px] text-slate-400 font-medium px-4">
+                  Checkout must be finalized before this clock expires, or stock will release.
                 </p>
               </div>
             )}
 
             {/* Error notifications */}
             {error && (
-              <div className="bg-red-950/60 border border-red-800/80 rounded-lg p-3 text-red-200 text-xs flex gap-2">
-                <span>⚠️</span>
-                <div className="flex-1">{error}</div>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-red-800 text-xs flex gap-3 shadow-sm font-semibold">
+                <span className="text-sm">⚠️</span>
+                <div className="flex-1 leading-relaxed">{error}</div>
               </div>
             )}
 
             {/* Expiry Banner */}
             {isReleased && (reservation.status === 'pending' || isExpired) && (
-              <div className="bg-red-950/40 border border-red-900/60 rounded-xl p-5 text-center space-y-2">
-                <div className="text-2xl font-bold text-red-400">Hold Expired</div>
-                <p className="text-slate-400 text-xs">
-                  This reservation reservation has expired and the allocated items have been returned to the available stock pool.
+              <div className="bg-red-50 border border-red-200/80 rounded-2xl p-6 text-center space-y-2 shadow-sm">
+                <div className="text-xl font-black text-red-700 flex items-center justify-center gap-1.5">
+                  <span>🔒</span> Hold Period Expired
+                </div>
+                <p className="text-slate-500 text-xs font-semibold leading-relaxed">
+                  This reservation window closed. The allocated units have been safely returned to the active stock pool.
                 </p>
               </div>
             )}
 
             {/* Product description list */}
-            <div className="space-y-4">
-              <div className="flex justify-between border-b border-slate-800 pb-3 text-sm">
-                <span className="text-slate-500 font-medium">Product</span>
-                <span className="text-white font-bold">{product.name}</span>
+            <div className="space-y-4 bg-slate-50/50 border border-border p-5 rounded-2xl">
+              <div className="flex justify-between border-b border-slate-200 pb-3 text-xs md:text-sm">
+                <span className="text-slate-500 font-bold flex items-center gap-1.5">📦 Product</span>
+                <span className="text-primary font-black">{product.name}</span>
               </div>
-              <div className="flex justify-between border-b border-slate-800 pb-3 text-sm">
-                <span className="text-slate-500 font-medium">Warehouse</span>
-                <span className="text-slate-300 font-bold">🏠 {warehouse.name}</span>
+              <div className="flex justify-between border-b border-slate-200 pb-3 text-xs md:text-sm">
+                <span className="text-slate-500 font-bold flex items-center gap-1.5">🏠 Warehouse Node</span>
+                <span className="text-slate-800 font-black">{warehouse.name}</span>
               </div>
-              <div className="flex justify-between border-b border-slate-800 pb-3 text-sm">
-                <span className="text-slate-500 font-medium">Quantity Requested</span>
-                <span className="text-white font-extrabold">{reservation.quantity} Units</span>
+              <div className="flex justify-between border-b border-slate-200 pb-3 text-xs md:text-sm">
+                <span className="text-slate-500 font-bold flex items-center gap-1.5">🔢 Quantity Locked</span>
+                <span className="text-accent font-black text-base">{reservation.quantity} Units</span>
               </div>
-              <div className="flex justify-between pb-1 text-sm">
-                <span className="text-slate-500 font-medium">Lifecycle Status</span>
-                <span className="text-slate-300 font-bold capitalize">{reservation.status}</span>
+              <div className="flex justify-between pb-1 text-xs md:text-sm">
+                <span className="text-slate-500 font-bold flex items-center gap-1.5">⚙️ Lifecycle Status</span>
+                <span className="text-slate-800 font-black capitalize">{reservation.status}</span>
               </div>
             </div>
 
             {/* Actions button group */}
             {isPending && (
-              <div className="pt-4 grid grid-cols-2 gap-4">
+              <div className="pt-4 grid grid-cols-2 gap-4 border-t border-slate-100">
                 <button
                   onClick={handleCancel}
                   disabled={actionLoading}
-                  className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold py-2 px-4 rounded transition disabled:opacity-50 text-sm"
+                  className="bg-white hover:bg-slate-100 border border-border text-slate-700 font-bold py-2.5 px-4 rounded-xl transition disabled:opacity-50 text-xs md:text-sm cursor-pointer shadow-sm hover:shadow active:scale-98"
                 >
                   Cancel Hold
                 </button>
@@ -257,15 +267,20 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
                 <button
                   onClick={handleConfirm}
                   disabled={actionLoading}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2 px-4 rounded transition disabled:opacity-50 text-sm flex items-center justify-center gap-2"
+                  className="bg-accent hover:bg-accent/90 text-white font-bold py-2.5 px-4 rounded-xl transition disabled:opacity-50 text-xs md:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg active:scale-98"
                 >
                   {actionLoading ? (
                     <>
                       <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                      Completing...
+                      Locking...
                     </>
                   ) : (
-                    'Confirm Purchase'
+                    <>
+                      <span>Confirm Order</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor" className="w-4 h-4">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                      </svg>
+                    </>
                   )}
                 </button>
               </div>
@@ -273,10 +288,12 @@ export default function ReservationPage({ params }: { params: Promise<{ id: stri
 
             {/* Success state completion */}
             {isConfirmed && (
-              <div className="bg-emerald-950/30 border border-emerald-900/60 rounded-xl p-5 text-center space-y-2">
-                <div className="text-xl font-bold text-emerald-400">Order Finalized</div>
-                <p className="text-slate-400 text-xs">
-                  Thank you! Your purchase is successfully locked. {reservation.quantity} items have been permanently deducted from stock.
+              <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-6 text-center space-y-2 shadow-sm">
+                <div className="text-xl font-black text-emerald-700 flex items-center justify-center gap-1.5">
+                  <span>✓</span> Purchase Secured
+                </div>
+                <p className="text-slate-500 text-xs font-semibold leading-relaxed">
+                  Locking finalized! {reservation.quantity} items have been permanently deducted from warehouse stock.
                 </p>
               </div>
             )}
