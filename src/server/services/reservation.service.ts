@@ -107,6 +107,14 @@ export class ReservationService {
           status: ReservationStatus.confirmed,
           confirmedAt: new Date(),
         },
+        include: {
+          inventory: {
+            include: {
+              product: true,
+              warehouse: true,
+            },
+          },
+        },
       });
     });
   }
@@ -145,6 +153,14 @@ export class ReservationService {
         data: {
           status: ReservationStatus.released,
           releasedAt: new Date(),
+        },
+        include: {
+          inventory: {
+            include: {
+              product: true,
+              warehouse: true,
+            },
+          },
         },
       });
     });
