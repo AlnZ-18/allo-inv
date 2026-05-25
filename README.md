@@ -5,7 +5,7 @@ A production-ready, high-integrity inventory reservation platform built to manag
 ---
 
 ## 🔗 Live Demo
-* **Production Deployed Application**: [https://inventory-reservation-system.vercel.app](https://inventory-reservation-system.vercel.app) *(Placeholder)*
+* **Production Deployed Application**: [https://inventory-reservation-system.vercel.app]([https://inventory-reservation-system.vercel.app](https://allo-inv-lovat.vercel.app/products))
 * **Database Infrastructure**: Managed via Neon PostgreSQL serverless instances.
 
 ---
